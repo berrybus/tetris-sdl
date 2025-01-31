@@ -1,9 +1,11 @@
 #include <SDL2/SDL.h>
 
+#include <SDL2/SDL_keycode.h>
 #include <SDL2/SDL_render.h>
 #include <SDL2/SDL_stdinc.h>
 #include <SDL2/SDL_timer.h>
 #include <ctime>
+#include <iostream>
 #include <random>
 #include <vector>
 
@@ -16,8 +18,8 @@ const int SCREEN_HEIGHT = GRID_HEIGHT * BLOCK_SIZE;
 const Uint32 UPDATE_DELAY = 750;
 
 const std::vector<std::vector<std::vector<int>>> BLOCKS = {
-    {{1, 1, 1, 1}},           {{1, 1}, {1, 1}},         {{0, 1, 0}, {1, 1, 1}},
-    {{1, 0}, {1, 0}, {1, 1}}, {{0, 1}, {0, 1}, {1, 1}}, {{0, 1, 1}, {1, 1, 0}},
+    {{1, 1, 1, 1}},         {{1, 1}, {1, 1}},       {{0, 1, 0}, {1, 1, 1}},
+    {{0, 0, 1}, {1, 1, 1}}, {{1, 0, 0}, {1, 1, 1}}, {{0, 1, 1}, {1, 1, 0}},
     {{1, 1, 0}, {0, 1, 1}}};
 
 const SDL_Color COLORS[] = {{0, 255, 255, 255}, {255, 255, 0, 255},
@@ -94,12 +96,14 @@ public:
   }
 
   void clearLines() {
-    bool lineFull = true;
+    bool lineFull;
     int lowestFullRow = GRID_HEIGHT - 1;
     for (int r = GRID_HEIGHT - 1; r >= 0; r--) {
+      lineFull = true;
       for (int c = 0; c < GRID_WIDTH; c++) {
         if (grid[r][c] < 0) {
           lineFull = false;
+          break;
         }
       }
       if (lineFull) {
@@ -145,6 +149,41 @@ public:
     if (!isColliding(rotated, curR, curC)) {
       currentPiece = std::move(rotated);
     }
+  }
+
+  void rotateCounterClockwise() {
+    std::vector<std::vector<int>> rotated;
+    int n = currentPiece.size();
+    int m = currentPiece[0].size();
+
+    rotated.resize(m, std::vector<int>(n));
+
+    for (int r = 0; r < n; r++) {
+      for (int c = 0; c < m; c++) {
+        rotated[c][r] = currentPiece[r][c];
+      }
+    }
+
+    for (int r = 0; r < m / 2; r++) {
+      for (int c = 0; c < n; c++) {
+        std::swap(rotated[r][c], rotated[m - r - 1][c]);
+      }
+    }
+
+    if (!isColliding(rotated, curR, curC)) {
+      currentPiece = std::move(rotated);
+    }
+  }
+
+  void dropPiece() {
+    while (!isColliding(currentPiece, curR + 1, curC) &&
+           curR < GRID_HEIGHT - currentPiece.size()) {
+      curR++;
+    }
+
+    addCurrentPiece();
+    clearLines();
+    spawnNewPiece();
   }
 
   void update() {
@@ -200,6 +239,27 @@ public:
         }
       }
     }
+
+    // draw ghost piece
+    int ghostRow = curR;
+    while (!isColliding(currentPiece, ghostRow + 1, curC) &&
+           ghostRow < GRID_HEIGHT - currentPiece.size()) {
+      ghostRow++;
+    }
+
+    for (int r = 0; r < currentPiece.size(); r++) {
+      for (int c = 0; c < currentPiece[0].size(); c++) {
+        if (currentPiece[r][c] > 0) {
+          SDL_Rect rect = {(curC + c) * BLOCK_SIZE, (ghostRow + r) * BLOCK_SIZE,
+                           BLOCK_SIZE, BLOCK_SIZE};
+          SDL_Color color = COLORS[curType];
+          SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+          SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 128);
+          SDL_RenderFillRect(renderer, &rect);
+        }
+      }
+    }
+
     SDL_RenderPresent(renderer);
   }
 };
@@ -208,7 +268,7 @@ int main() {
   Tetris game;
   SDL_Event event;
   Uint32 lastUpdate = SDL_GetTicks();
-
+  Uint32 acc = 0;
   while (!game.gameOver) {
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_QUIT) {
@@ -225,18 +285,26 @@ int main() {
         case SDLK_UP:
           game.rotateClockwise();
           break;
+        case SDLK_z:
+          game.rotateCounterClockwise();
+          break;
         case SDLK_DOWN:
           game.update();
+          lastUpdate = SDL_GetTicks();
+          break;
+        case SDLK_SPACE:
+          game.dropPiece();
           lastUpdate = SDL_GetTicks();
           break;
         }
       }
     }
-
     Uint32 currentTime = SDL_GetTicks();
-    if (currentTime - lastUpdate >= UPDATE_DELAY) {
+    acc += (currentTime - lastUpdate);
+    lastUpdate = currentTime;
+    while (acc >= UPDATE_DELAY) {
       game.update();
-      lastUpdate = currentTime;
+      acc -= UPDATE_DELAY;
     }
 
     game.render();
