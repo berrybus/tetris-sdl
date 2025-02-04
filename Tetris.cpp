@@ -31,15 +31,17 @@ const SDL_Color COLORS[] = {{0, 255, 255, 255}, {255, 255, 0, 255},
                             {0, 0, 255, 255},   {0, 255, 0, 255},
                             {255, 0, 0, 255}};
 
-Tetris::Tetris(SceneManager &sceneManager)
-    : Scene(sceneManager), grid(GRID_HEIGHT, std::vector<int>(GRID_WIDTH, -1)),
-      gameOver(false), lastUpdate(SDL_GetTicks()) {
+Tetris::Tetris(SceneManager& sceneManager)
+    : Scene(sceneManager),
+      grid(GRID_HEIGHT, std::vector<int>(GRID_WIDTH, -1)),
+      gameOver(false),
+      lastUpdate(SDL_GetTicks()) {
   SDL_Init(SDL_INIT_VIDEO);
   spawnNewPiece();
 }
 
 void Tetris::spawnNewPiece() {
-  std::random_device rd; // a seed source for the random number engine
+  std::random_device rd;  // a seed source for the random number engine
   std::mt19937 gen(rd());
   std::uniform_int_distribution<int> dist(0, BLOCKS.size() - 1);
   curType = dist(gen);
@@ -47,18 +49,28 @@ void Tetris::spawnNewPiece() {
   curC = GRID_WIDTH / 2 - currentPiece[0].size() / 2;
   curR = 0;
   if (isColliding(currentPiece, curR, curC)) {
-    std::cout << "colliding in spawn new piece" << std::endl;
     gameOver = true;
   }
 }
 
-bool Tetris::isColliding(std::vector<std::vector<int>> &piece, int pieceRow,
+void Tetris::reset() {
+  for (int r = 0; r < GRID_HEIGHT; r++) {
+    for (int c = 0; c < GRID_WIDTH; c++) {
+      grid[r][c] = -1;
+    }
+  }
+  spawnNewPiece();
+}
+
+bool Tetris::isColliding(std::vector<std::vector<int>>& piece,
+                         int pieceRow,
                          int pieceCol) {
   for (int r = 0; r < piece.size(); r++) {
     for (int c = 0; c < piece[0].size(); c++) {
       if (piece[r][c] == 0) {
         continue;
       }
+
       int gr = pieceRow + r;
       int gc = pieceCol + c;
       if (gc < 0 || gc >= GRID_WIDTH || gr >= GRID_HEIGHT ||
@@ -135,6 +147,12 @@ void Tetris::rotateClockwise() {
 
   if (!isColliding(rotated, curR, curC)) {
     currentPiece = std::move(rotated);
+  } else {
+    for (int r = 0; r < n / 2; r++) {
+      for (int c = 0; c < m; c++) {
+        std::swap(currentPiece[r][c], currentPiece[n - r - 1][c]);
+      }
+    }
   }
 }
 
@@ -198,7 +216,7 @@ void Tetris::moveRight() {
   }
 }
 
-void Tetris::render(SDL_Renderer *renderer) {
+void Tetris::render(SDL_Renderer* renderer) {
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
   SDL_RenderClear(renderer);
 
@@ -247,48 +265,51 @@ void Tetris::render(SDL_Renderer *renderer) {
   }
 }
 
-void Tetris::handleInput(const SDL_Event &event) {
+void Tetris::handleInput(const SDL_Event& event) {
   if (event.type == SDL_KEYDOWN) {
     switch (event.key.keysym.sym) {
-    case SDLK_LEFT:
-      if (!leftPressed) {
-        moveLeft();
-        leftPressed = true;
-        leftTimer = SDL_GetTicks() + DAS_DELAY;
-      }
-      break;
-    case SDLK_RIGHT:
-      if (!rightPressed) {
-        moveRight();
-        rightPressed = true;
-        rightTimer = SDL_GetTicks() + DAS_DELAY;
-      }
-      break;
-    case SDLK_UP:
-      rotateClockwise();
-      break;
-    case SDLK_z:
-      rotateCounterClockwise();
-      break;
-    case SDLK_DOWN:
-      progressPieces();
-      lastUpdate = SDL_GetTicks();
-      break;
-    case SDLK_SPACE:
-      dropPiece();
-      lastUpdate = SDL_GetTicks();
-      break;
+      case SDLK_LEFT:
+        if (!leftPressed) {
+          moveLeft();
+          leftPressed = true;
+          leftTimer = SDL_GetTicks() + DAS_DELAY;
+        }
+        break;
+      case SDLK_RIGHT:
+        if (!rightPressed) {
+          moveRight();
+          rightPressed = true;
+          rightTimer = SDL_GetTicks() + DAS_DELAY;
+        }
+        break;
+      case SDLK_UP:
+        rotateClockwise();
+        break;
+      case SDLK_z:
+        rotateCounterClockwise();
+        break;
+      case SDLK_r:
+        reset();
+        break;
+      case SDLK_DOWN:
+        progressPieces();
+        lastUpdate = SDL_GetTicks();
+        break;
+      case SDLK_SPACE:
+        dropPiece();
+        lastUpdate = SDL_GetTicks();
+        break;
     }
   }
 
   if (event.type == SDL_KEYUP) {
     switch (event.key.keysym.sym) {
-    case SDLK_LEFT:
-      leftPressed = false;
-      break;
-    case SDLK_RIGHT:
-      rightPressed = false;
-      break;
+      case SDLK_LEFT:
+        leftPressed = false;
+        break;
+      case SDLK_RIGHT:
+        rightPressed = false;
+        break;
     }
   }
 }
@@ -299,11 +320,11 @@ void Tetris::update() {
     progressPieces();
     lastUpdate = currentTime;
   }
-  if (leftPressed && currentTime >= leftTimer) {
+  if (!rightPressed && leftPressed && currentTime >= leftTimer) {
     moveLeft();
     leftTimer = currentTime + DAS_REPEAT;
   }
-  if (rightPressed && currentTime >= rightTimer) {
+  if (!leftPressed && rightPressed && currentTime >= rightTimer) {
     moveRight();
     rightTimer = currentTime + DAS_REPEAT;
   }

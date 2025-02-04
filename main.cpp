@@ -14,12 +14,16 @@
 #define SCREEN_WIDTH 300
 #define SCREEN_HEIGHT 600
 
-int main() {
-  SDL_Window *window =
-      SDL_CreateWindow("Tetris", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                       SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
-  SDL_Renderer *renderer = SDL_CreateRenderer(
-      window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+int
+main() {
+  SDL_Window* window = SDL_CreateWindow("Tetris",
+                                        SDL_WINDOWPOS_CENTERED,
+                                        SDL_WINDOWPOS_CENTERED,
+                                        SCREEN_WIDTH,
+                                        SCREEN_HEIGHT,
+                                        SDL_WINDOW_SHOWN);
+  SDL_Renderer* renderer = SDL_CreateRenderer(
+    window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
   SceneManager sceneManager = SceneManager();
   sceneManager.change(std::make_shared<Tetris>(sceneManager));
   SDL_Event event;

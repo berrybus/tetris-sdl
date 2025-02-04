@@ -1,2 +1,5 @@
 *.gch
-
+.cache
+.sconsign.dblite
+*.o
+tetris

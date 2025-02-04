@@ -16,7 +16,7 @@
 #include "Scene.h"
 
 class Tetris : public Scene {
-private:
+ private:
   std::vector<std::vector<int>> grid;
   std::vector<std::vector<int>> currentPiece;
   int curR;
@@ -41,8 +41,9 @@ private:
   void progressPieces();
   void moveLeft();
   void moveRight();
+  void reset();
 
-public:
+ public:
   Tetris(SceneManager& sceneManager);
 
   bool shouldQuit() override { return gameOver; };
