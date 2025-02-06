@@ -1,4 +1,5 @@
 #include "Tetris.h"
+#include <iterator>
 #include <memory>
 
 const int BLOCK_SIZE = 30;
@@ -31,6 +32,28 @@ const SDL_Color COLORS[] = {{0, 255, 255, 255}, {255, 255, 0, 255},
                             {0, 0, 255, 255},   {0, 255, 0, 255},
                             {255, 0, 0, 255}};
 
+const std::vector<std::vector<std::vector<int>>> WALL_KICK_I = {
+    // 0 -> 1, 3 -> 2
+    {{0, 0}, {-2, 0}, {1, 0}, {-2, -1}, {1, 2}},
+    // 1 -> 0, 2 -> 3
+    {{0, 0}, {2, 0}, {-1, 0}, {2, 1}, {-1, -2}},
+    // 1 -> 2, 0 -> 3
+    {{0, 0}, {-1, 0}, {-2, 0}, {-1, 2}, {2, -1}},
+    // 2 -> 1, 3 -> 0
+    {{0, 0}, {1, 0}, {-2, 0}, {1, -2}, {-2, 1}},
+};
+
+const std::vector<std::vector<std::vector<int>>> WALL_KICK_NONE_I = {
+    // 0 -> 1, 2 -> 1
+    {{0, 0}, {-1, 0}, {-1, 1}, {0, -2}, {-1, -2}},
+    // 1 -> 0, 1 -> 2
+    {{0, 0}, {1, 0}, {1, -1}, {0, 2}, {1, 2}},
+    // 2 -> 3, 0 -> 3
+    {{0, 0}, {1, 0}, {1, 1}, {0, -2}, {1, -2}},
+    // 3 -> 2, 3 -> 0
+    {{0, 0}, {-1, 0}, {-1, -1}, {0, 2}, {-1, 2}},
+};
+
 Tetris::Tetris(SceneManager& sceneManager)
     : Scene(sceneManager),
       grid(GRID_HEIGHT, std::vector<int>(GRID_WIDTH, -1)),
@@ -48,6 +71,7 @@ void Tetris::spawnNewPiece() {
   currentPiece = BLOCKS[curType];
   curC = GRID_WIDTH / 2 - currentPiece[0].size() / 2;
   curR = 0;
+  curRotation = 0;
   if (isColliding(currentPiece, curR, curC)) {
     gameOver = true;
   }
@@ -126,6 +150,44 @@ void Tetris::clearLines() {
   }
 }
 
+std::vector<std::vector<int>> Tetris::getWallKickData(int curRotation,
+                                                      int nextRotation) {
+  // I piece
+  if (curType == 0) {
+    if ((curRotation == 0 && nextRotation == 1) ||
+        (curRotation == 3 && nextRotation == 2)) {
+      return WALL_KICK_I[0];
+    } else if ((curRotation == 1 && nextRotation == 0) ||
+               (curRotation == 2 && nextRotation == 3)) {
+      return WALL_KICK_I[1];
+    } else if ((curRotation == 1 && nextRotation == 2) ||
+               (curRotation == 0 && nextRotation == 3)) {
+      return WALL_KICK_I[2];
+    } else if ((curRotation == 2 && nextRotation == 1) ||
+               (curRotation == 3 && nextRotation == 0)) {
+      return WALL_KICK_I[3];
+    }
+    // none I piece
+  } else {
+    if ((curRotation == 0 && nextRotation == 1) ||
+        (curRotation == 2 && nextRotation == 1)) {
+      return WALL_KICK_NONE_I[0];
+    } else if ((curRotation == 1 && nextRotation == 0) ||
+               (curRotation == 1 && nextRotation == 2)) {
+      return WALL_KICK_NONE_I[1];
+    } else if ((curRotation == 2 && nextRotation == 3) ||
+               (curRotation == 0 && nextRotation == 3)) {
+      return WALL_KICK_NONE_I[2];
+    } else if ((curRotation == 3 && nextRotation == 2) ||
+               (curRotation == 3 && nextRotation == 0)) {
+      return WALL_KICK_NONE_I[3];
+    }
+  }
+  // should never get here
+  std::cout << curRotation << ", " << nextRotation << std::endl;
+  return {{0, 0}};
+}
+
 void Tetris::rotateClockwise() {
   std::vector<std::vector<int>> rotated;
   int n = currentPiece.size();
@@ -145,13 +207,26 @@ void Tetris::rotateClockwise() {
     }
   }
 
-  if (!isColliding(rotated, curR, curC)) {
-    currentPiece = std::move(rotated);
-  } else {
-    for (int r = 0; r < n / 2; r++) {
-      for (int c = 0; c < m; c++) {
-        std::swap(currentPiece[r][c], currentPiece[n - r - 1][c]);
-      }
+  int nextRotation = (curRotation + 1) % 4;
+
+  std::vector<std::vector<int>> kicks =
+      getWallKickData(curRotation, nextRotation);
+
+  for (auto& offset : kicks) {
+    int offsetR = offset[1];
+    int offsetC = offset[0];
+    if (!isColliding(rotated, curR + offsetR, curC + offsetC)) {
+      currentPiece = std::move(rotated);
+      curR = curR + offsetR;
+      curC = curC + offsetC;
+      curRotation = nextRotation;
+      return;
+    }
+  }
+
+  for (int r = 0; r < n / 2; r++) {
+    for (int c = 0; c < m; c++) {
+      std::swap(currentPiece[r][c], currentPiece[n - r - 1][c]);
     }
   }
 }
@@ -175,8 +250,21 @@ void Tetris::rotateCounterClockwise() {
     }
   }
 
-  if (!isColliding(rotated, curR, curC)) {
-    currentPiece = std::move(rotated);
+  int nextRotation = (curRotation - 1 + 4) % 4;
+
+  std::vector<std::vector<int>> kicks =
+      getWallKickData(curRotation, nextRotation);
+
+  for (auto& offset : kicks) {
+    int offsetR = offset[1];
+    int offsetC = offset[0];
+    if (!isColliding(rotated, curR + offsetR, curC + offsetC)) {
+      currentPiece = std::move(rotated);
+      curR = curR + offsetR;
+      curC = curC + offsetC;
+      curRotation = nextRotation;
+      return;
+    }
   }
 }
 

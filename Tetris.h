@@ -22,6 +22,7 @@ class Tetris : public Scene {
   int curR;
   int curC;
   int curType;
+  int curRotation;
   bool leftPressed = false;
   bool rightPressed = false;
   Uint32 lastUpdate;
@@ -42,6 +43,8 @@ class Tetris : public Scene {
   void moveLeft();
   void moveRight();
   void reset();
+  std::vector<std::vector<int>> getWallKickData(int curRotation,
+                                                int nextRotation);
 
  public:
   Tetris(SceneManager& sceneManager);
