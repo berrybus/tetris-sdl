@@ -6,19 +6,19 @@
 class Scene;
 
 class SceneManager {
-public:
+ public:
   std::shared_ptr<Scene> curScene;
   void change(std::shared_ptr<Scene> newScene) { curScene = newScene; }
 };
 
 class Scene {
-private:
-  SceneManager &sceneManager;
+ private:
+  SceneManager& sceneManager;
 
-public:
-  virtual void handleInput(const SDL_Event &event) = 0;
+ public:
+  virtual void handleInput(const SDL_Event& event) = 0;
   virtual void update() = 0;
-  virtual void render(SDL_Renderer *renderer) = 0;
+  virtual void render() = 0;
   virtual bool shouldQuit() = 0;
-  Scene(SceneManager &manager) : sceneManager(manager) {};
+  Scene(SceneManager& manager) : sceneManager(manager) {};
 };

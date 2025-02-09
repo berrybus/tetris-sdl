@@ -1,15 +1,25 @@
-#include "Tetris.h"
+#include "tetris.h"
+#include <SDL2/SDL_keycode.h>
+#include <SDL2/SDL_render.h>
+#include <SDL2/SDL_timer.h>
+#include <SDL2/SDL_ttf.h>
 #include <iterator>
 #include <memory>
+#include "globals.h"
 
 const int BLOCK_SIZE = 30;
 const int GRID_WIDTH = 10;
 const int GRID_HEIGHT = 20;
+const int GRID_OFFSET_X = 40;
+const int GRID_OFFSET_Y = 60;
 
 const Uint32 UPDATE_DELAY = 1000;
+const Uint32 LAST_ROW_UPDATE_DELAY = 2000;
 
 const uint32_t DAS_DELAY = 133;
 const uint32_t DAS_REPEAT = 10;
+
+const char* INSTRUCTIONS = "Arrow keys - move\nUp/Z - rotate\nR - restart";
 
 const std::vector<std::vector<std::vector<int>>> BLOCKS = {
     // I
@@ -59,7 +69,11 @@ Tetris::Tetris(SceneManager& sceneManager)
       grid(GRID_HEIGHT, std::vector<int>(GRID_WIDTH, -1)),
       gameOver(false),
       lastUpdate(SDL_GetTicks()) {
-  SDL_Init(SDL_INIT_VIDEO);
+  SDL_Color textColor = {255, 255, 255, 255};
+  instructionsSurface = TTF_RenderText_Blended_Wrapped(
+      Globals::openSans, INSTRUCTIONS, textColor, 250);
+  instructionsTexture =
+      SDL_CreateTextureFromSurface(Globals::renderer, instructionsSurface);
   spawnNewPiece();
 }
 
@@ -213,7 +227,7 @@ void Tetris::rotateClockwise() {
       getWallKickData(curRotation, nextRotation);
 
   for (auto& offset : kicks) {
-    int offsetR = offset[1];
+    int offsetR = -offset[1];
     int offsetC = offset[0];
     if (!isColliding(rotated, curR + offsetR, curC + offsetC)) {
       currentPiece = std::move(rotated);
@@ -256,7 +270,7 @@ void Tetris::rotateCounterClockwise() {
       getWallKickData(curRotation, nextRotation);
 
   for (auto& offset : kicks) {
-    int offsetR = offset[1];
+    int offsetR = -offset[1];
     int offsetC = offset[0];
     if (!isColliding(rotated, curR + offsetR, curC + offsetC)) {
       currentPiece = std::move(rotated);
@@ -304,18 +318,26 @@ void Tetris::moveRight() {
   }
 }
 
-void Tetris::render(SDL_Renderer* renderer) {
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-  SDL_RenderClear(renderer);
+void Tetris::render() {
+  SDL_SetRenderDrawColor(Globals::renderer, 0, 0, 0, 255);
+  SDL_RenderClear(Globals::renderer);
 
   for (int r = 0; r < GRID_HEIGHT; r++) {
     for (int c = 0; c < GRID_WIDTH; c++) {
       if (grid[r][c] >= 0) {
-        SDL_Rect rect = {c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE,
+        SDL_Rect rect = {c * BLOCK_SIZE + GRID_OFFSET_X,
+                         r * BLOCK_SIZE + GRID_OFFSET_Y, BLOCK_SIZE,
                          BLOCK_SIZE};
         SDL_Color color = COLORS[grid[r][c]];
-        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
-        SDL_RenderFillRect(renderer, &rect);
+        SDL_SetRenderDrawColor(Globals::renderer, color.r, color.g, color.b,
+                               color.a);
+        SDL_RenderFillRect(Globals::renderer, &rect);
+      } else {
+        SDL_Rect rect = {c * BLOCK_SIZE + GRID_OFFSET_X,
+                         r * BLOCK_SIZE + GRID_OFFSET_Y, BLOCK_SIZE,
+                         BLOCK_SIZE};
+        SDL_SetRenderDrawColor(Globals::renderer, 255, 255, 255, 32);
+        SDL_RenderDrawRect(Globals::renderer, &rect);
       }
     }
   }
@@ -323,11 +345,13 @@ void Tetris::render(SDL_Renderer* renderer) {
   for (int r = 0; r < currentPiece.size(); r++) {
     for (int c = 0; c < currentPiece[0].size(); c++) {
       if (currentPiece[r][c] > 0) {
-        SDL_Rect rect = {(curC + c) * BLOCK_SIZE, (curR + r) * BLOCK_SIZE,
-                         BLOCK_SIZE, BLOCK_SIZE};
+        SDL_Rect rect = {(curC + c) * BLOCK_SIZE + GRID_OFFSET_X,
+                         (curR + r) * BLOCK_SIZE + GRID_OFFSET_Y, BLOCK_SIZE,
+                         BLOCK_SIZE};
         SDL_Color color = COLORS[curType];
-        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
-        SDL_RenderFillRect(renderer, &rect);
+        SDL_SetRenderDrawColor(Globals::renderer, color.r, color.g, color.b,
+                               color.a);
+        SDL_RenderFillRect(Globals::renderer, &rect);
       }
     }
   }
@@ -342,15 +366,25 @@ void Tetris::render(SDL_Renderer* renderer) {
   for (int r = 0; r < currentPiece.size(); r++) {
     for (int c = 0; c < currentPiece[0].size(); c++) {
       if (currentPiece[r][c] > 0) {
-        SDL_Rect rect = {(curC + c) * BLOCK_SIZE, (ghostRow + r) * BLOCK_SIZE,
+        SDL_Rect rect = {(curC + c) * BLOCK_SIZE + GRID_OFFSET_X,
+                         (ghostRow + r) * BLOCK_SIZE + GRID_OFFSET_Y,
                          BLOCK_SIZE, BLOCK_SIZE};
         SDL_Color color = COLORS[curType];
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 128);
-        SDL_RenderFillRect(renderer, &rect);
+        SDL_SetRenderDrawBlendMode(Globals::renderer, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(Globals::renderer, color.r, color.g, color.b,
+                               128);
+        SDL_RenderFillRect(Globals::renderer, &rect);
       }
     }
   }
+
+  // draw instructions
+  SDL_Rect instructionsRect = {
+      GRID_WIDTH * BLOCK_SIZE + GRID_OFFSET_X + 30,
+      GRID_HEIGHT * BLOCK_SIZE + GRID_OFFSET_Y - instructionsSurface->h,
+      instructionsSurface->w, instructionsSurface->h};
+  SDL_RenderCopy(Globals::renderer, instructionsTexture, NULL,
+                 &instructionsRect);
 }
 
 void Tetris::handleInput(const SDL_Event& event) {
@@ -381,7 +415,12 @@ void Tetris::handleInput(const SDL_Event& event) {
         break;
       case SDLK_DOWN:
         progressPieces();
-        lastUpdate = SDL_GetTicks();
+        if (!downPressed) {
+          downPressed = true;
+          downTimer = SDL_GetTicks() + DAS_DELAY;
+        } else {
+          lastUpdate = SDL_GetTicks();
+        }
         break;
       case SDLK_SPACE:
         dropPiece();
@@ -398,13 +437,21 @@ void Tetris::handleInput(const SDL_Event& event) {
       case SDLK_RIGHT:
         rightPressed = false;
         break;
+      case SDLK_DOWN:
+        downPressed = false;
+        break;
     }
   }
 }
 
 void Tetris::update() {
   Uint32 currentTime = SDL_GetTicks();
-  if (currentTime - lastUpdate >= UPDATE_DELAY) {
+  // If the piece is colliding below, give the user extra time to make rotation
+  Uint32 update_delay = isColliding(currentPiece, curR + 1, curC)
+                            ? LAST_ROW_UPDATE_DELAY
+                            : UPDATE_DELAY;
+
+  if (currentTime - lastUpdate >= update_delay) {
     progressPieces();
     lastUpdate = currentTime;
   }
@@ -415,5 +462,11 @@ void Tetris::update() {
   if (!leftPressed && rightPressed && currentTime >= rightTimer) {
     moveRight();
     rightTimer = currentTime + DAS_REPEAT;
+  }
+
+  if (downPressed && !isColliding(currentPiece, curR + 1, curC) &&
+      currentTime >= downTimer) {
+    progressPieces();
+    downTimer = currentTime + DAS_REPEAT;
   }
 }

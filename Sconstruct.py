@@ -1,10 +1,9 @@
 import os
 from SCons.Script import Environment
 
-env  = Environment(CCFLAGS=['-std=c++17'])
+# These should be standard install paths
+env  = Environment(CPPATH=['/usr/include/SDL2'],LIBPATH=['/usr/lib'],LIBS=['SDL2', 'SDL2_ttf'],CCFLAGS=['-std=c++17'])
 
-env.ParseConfig('pkg-config --cflags --libs sdl2')
-
-source_files = ['main.cpp', 'Tetris.cpp']
+source_files = ['main.cpp', 'tetris.cpp']
 
 env.Program(target='tetris', source=source_files)

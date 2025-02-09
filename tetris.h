@@ -25,10 +25,14 @@ class Tetris : public Scene {
   int curRotation;
   bool leftPressed = false;
   bool rightPressed = false;
+  bool downPressed = false;
   Uint32 lastUpdate;
   uint32_t leftTimer = 0;
   uint32_t rightTimer = 0;
+  uint32_t downTimer = 0;
   bool gameOver;
+  SDL_Surface* instructionsSurface;
+  SDL_Texture* instructionsTexture;
 
   void spawnNewPiece();
   bool isColliding(std::vector<std::vector<int>>& piece,
@@ -51,7 +55,7 @@ class Tetris : public Scene {
 
   bool shouldQuit() override { return gameOver; };
 
-  void render(SDL_Renderer* renderer) override;
+  void render() override;
 
   void handleInput(const SDL_Event& event) override;
 
