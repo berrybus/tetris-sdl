@@ -1,17 +1,23 @@
 #include "tetris.h"
+#include <SDL2/SDL_events.h>
 #include <SDL2/SDL_keycode.h>
 #include <SDL2/SDL_render.h>
+#include <SDL2/SDL_stdinc.h>
 #include <SDL2/SDL_timer.h>
 #include <SDL2/SDL_ttf.h>
+#include <sys/types.h>
+#include <cstdint>
+#include <format>
 #include <iterator>
 #include <memory>
-#include "globals.h"
+#include "font_manager.h"
+#include "rng.h"
 
 const int BLOCK_SIZE = 30;
 const int GRID_WIDTH = 10;
 const int GRID_HEIGHT = 20;
-const int GRID_OFFSET_X = 40;
-const int GRID_OFFSET_Y = 60;
+const int GRID_OFFSET_X = 200;
+const int GRID_OFFSET_Y = 80;
 
 const Uint32 UPDATE_DELAY = 1000;
 const Uint32 LAST_ROW_UPDATE_DELAY = 2000;
@@ -19,7 +25,8 @@ const Uint32 LAST_ROW_UPDATE_DELAY = 2000;
 const uint32_t DAS_DELAY = 133;
 const uint32_t DAS_REPEAT = 10;
 
-const char* INSTRUCTIONS = "Arrow keys - move\nUp/Z - rotate\nR - restart";
+const char* INSTRUCTIONS =
+    "Arrow keys - move\nUp/Z - rotate\nC - hold\nR - restart";
 
 const std::vector<std::vector<std::vector<int>>> BLOCKS = {
     // I
@@ -64,30 +71,50 @@ const std::vector<std::vector<std::vector<int>>> WALL_KICK_NONE_I = {
     {{0, 0}, {-1, 0}, {-1, -1}, {0, 2}, {-1, 2}},
 };
 
+int getRandomType() {
+  static std::uniform_int_distribution<int> dist(0, BLOCKS.size() - 1);
+  return dist(RNG::getInstance().gen);
+}
+
+std::string formatMilliseconds(uint32_t ms) {
+  int minutes = ms / 60000;
+  int seconds = (ms % 60000) / 1000;
+  // Only want to display 2 ms digits
+  int milliseconds = (ms % 1000) / 10;
+
+  return std::format("Time: {:02}:{:02}.{:02}", minutes, seconds, milliseconds);
+}
+
 Tetris::Tetris(SceneManager& sceneManager)
     : Scene(sceneManager),
       grid(GRID_HEIGHT, std::vector<int>(GRID_WIDTH, -1)),
       gameOver(false),
-      lastUpdate(SDL_GetTicks()) {
+      lastUpdate(SDL_GetTicks()),
+      heldPieceType(-1),
+      nextType(-1),
+      canSwap(true) {
   SDL_Color textColor = {255, 255, 255, 255};
-  instructionsSurface = TTF_RenderText_Blended_Wrapped(
-      Globals::openSans, INSTRUCTIONS, textColor, 250);
-  instructionsTexture =
-      SDL_CreateTextureFromSurface(Globals::renderer, instructionsSurface);
+  reset();
   spawnNewPiece();
 }
 
-void Tetris::spawnNewPiece() {
-  std::random_device rd;  // a seed source for the random number engine
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution<int> dist(0, BLOCKS.size() - 1);
-  curType = dist(gen);
+void Tetris::spawnNewPiece(int spawnType) {
+  if (spawnType == -1) {
+    curType = nextType;
+    nextType = getRandomType();
+    canSwap = true;
+  } else {
+    curType = spawnType;
+  }
+
   currentPiece = BLOCKS[curType];
   curC = GRID_WIDTH / 2 - currentPiece[0].size() / 2;
   curR = 0;
   curRotation = 0;
   if (isColliding(currentPiece, curR, curC)) {
     gameOver = true;
+    finishTime = SDL_GetTicks();
+    gameOverText = "GAME OVER";
   }
 }
 
@@ -97,7 +124,12 @@ void Tetris::reset() {
       grid[r][c] = -1;
     }
   }
+  nextType = getRandomType();
+  heldPieceType = -1;
   spawnNewPiece();
+  startTime = SDL_GetTicks();
+  linesLeft = 40;
+  gameOver = false;
 }
 
 bool Tetris::isColliding(std::vector<std::vector<int>>& piece,
@@ -154,6 +186,8 @@ void Tetris::clearLines() {
     for (int nr = lowestFullRow; nr > 0; nr--) {
       grid[nr] = grid[nr - 1];
     }
+    linesLeft -= 1;
+    linesLeft = std::max(linesLeft, 0);
     grid[0] = std::vector<int>(GRID_WIDTH, -1);
     for (int c = 0; c < GRID_WIDTH; c++) {
       if (grid[lowestFullRow][c] < 0) {
@@ -161,6 +195,12 @@ void Tetris::clearLines() {
         break;
       }
     }
+  }
+
+  if (linesLeft == 0) {
+    gameOver = true;
+    finishTime = SDL_GetTicks();
+    gameOverText = "YOU WIN!";
   }
 }
 
@@ -318,76 +358,150 @@ void Tetris::moveRight() {
   }
 }
 
-void Tetris::render() {
-  SDL_SetRenderDrawColor(Globals::renderer, 0, 0, 0, 255);
-  SDL_RenderClear(Globals::renderer);
+void Tetris::render(SDL_Renderer* renderer) {
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+  SDL_RenderClear(renderer);
 
+  // draw existing grid
   for (int r = 0; r < GRID_HEIGHT; r++) {
     for (int c = 0; c < GRID_WIDTH; c++) {
       if (grid[r][c] >= 0) {
         SDL_Rect rect = {c * BLOCK_SIZE + GRID_OFFSET_X,
                          r * BLOCK_SIZE + GRID_OFFSET_Y, BLOCK_SIZE,
                          BLOCK_SIZE};
-        SDL_Color color = COLORS[grid[r][c]];
-        SDL_SetRenderDrawColor(Globals::renderer, color.r, color.g, color.b,
-                               color.a);
-        SDL_RenderFillRect(Globals::renderer, &rect);
+        SDL_Color color;
+        if (gameOver) {
+          color = {128, 128, 128, 255};
+        } else {
+          color = COLORS[grid[r][c]];
+        }
+        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+        SDL_RenderFillRect(renderer, &rect);
       } else {
         SDL_Rect rect = {c * BLOCK_SIZE + GRID_OFFSET_X,
                          r * BLOCK_SIZE + GRID_OFFSET_Y, BLOCK_SIZE,
                          BLOCK_SIZE};
-        SDL_SetRenderDrawColor(Globals::renderer, 255, 255, 255, 32);
-        SDL_RenderDrawRect(Globals::renderer, &rect);
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 32);
+        SDL_RenderDrawRect(renderer, &rect);
       }
     }
   }
 
-  for (int r = 0; r < currentPiece.size(); r++) {
-    for (int c = 0; c < currentPiece[0].size(); c++) {
-      if (currentPiece[r][c] > 0) {
-        SDL_Rect rect = {(curC + c) * BLOCK_SIZE + GRID_OFFSET_X,
-                         (curR + r) * BLOCK_SIZE + GRID_OFFSET_Y, BLOCK_SIZE,
-                         BLOCK_SIZE};
-        SDL_Color color = COLORS[curType];
-        SDL_SetRenderDrawColor(Globals::renderer, color.r, color.g, color.b,
-                               color.a);
-        SDL_RenderFillRect(Globals::renderer, &rect);
+  // Draw piece in play
+
+  if (!gameOver) {
+    for (int r = 0; r < currentPiece.size(); r++) {
+      for (int c = 0; c < currentPiece[0].size(); c++) {
+        if (currentPiece[r][c] > 0) {
+          SDL_Rect rect = {(curC + c) * BLOCK_SIZE + GRID_OFFSET_X,
+                           (curR + r) * BLOCK_SIZE + GRID_OFFSET_Y, BLOCK_SIZE,
+                           BLOCK_SIZE};
+          SDL_Color color = COLORS[curType];
+          SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+          SDL_RenderFillRect(renderer, &rect);
+        }
       }
     }
-  }
 
-  // draw ghost piece
-  int ghostRow = curR;
-  while (!isColliding(currentPiece, ghostRow + 1, curC) &&
-         ghostRow < GRID_HEIGHT) {
-    ghostRow++;
-  }
+    // draw ghost piece
+    int ghostRow = curR;
+    while (!isColliding(currentPiece, ghostRow + 1, curC) &&
+           ghostRow < GRID_HEIGHT) {
+      ghostRow++;
+    }
 
-  for (int r = 0; r < currentPiece.size(); r++) {
-    for (int c = 0; c < currentPiece[0].size(); c++) {
-      if (currentPiece[r][c] > 0) {
-        SDL_Rect rect = {(curC + c) * BLOCK_SIZE + GRID_OFFSET_X,
-                         (ghostRow + r) * BLOCK_SIZE + GRID_OFFSET_Y,
-                         BLOCK_SIZE, BLOCK_SIZE};
-        SDL_Color color = COLORS[curType];
-        SDL_SetRenderDrawBlendMode(Globals::renderer, SDL_BLENDMODE_BLEND);
-        SDL_SetRenderDrawColor(Globals::renderer, color.r, color.g, color.b,
-                               128);
-        SDL_RenderFillRect(Globals::renderer, &rect);
+    for (int r = 0; r < currentPiece.size(); r++) {
+      for (int c = 0; c < currentPiece[0].size(); c++) {
+        if (currentPiece[r][c] > 0) {
+          SDL_Rect rect = {(curC + c) * BLOCK_SIZE + GRID_OFFSET_X,
+                           (ghostRow + r) * BLOCK_SIZE + GRID_OFFSET_Y,
+                           BLOCK_SIZE, BLOCK_SIZE};
+          SDL_Color color = COLORS[curType];
+          SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+          SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 128);
+          SDL_RenderFillRect(renderer, &rect);
+        }
       }
     }
+
+    // held piece
+
+    if (heldPieceType >= 0) {
+      std::vector<std::vector<int>> heldPiece = BLOCKS[heldPieceType];
+      for (int r = 0; r < heldPiece.size(); r++) {
+        for (int c = 0; c < heldPiece[0].size(); c++) {
+          if (heldPiece[r][c] > 0) {
+            SDL_Rect rect = {c * BLOCK_SIZE + 40,
+                             r * BLOCK_SIZE + GRID_OFFSET_Y, BLOCK_SIZE,
+                             BLOCK_SIZE};
+            SDL_Color color = COLORS[heldPieceType];
+            SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b,
+                                   color.a);
+            SDL_RenderFillRect(renderer, &rect);
+          }
+        }
+      }
+    }
+
+    // next piece
+    int nextOffsetX = BLOCK_SIZE * GRID_WIDTH + GRID_OFFSET_X + 40;
+    int nextOffsetY = GRID_OFFSET_Y;
+    FontManager::getInstance().renderText(nextOffsetX, nextOffsetY, "Next", 0);
+    nextOffsetY += 48;
+
+    std::vector<std::vector<int>> nextPiece = BLOCKS[nextType];
+    for (int r = 0; r < nextPiece.size(); r++) {
+      for (int c = 0; c < nextPiece[0].size(); c++) {
+        if (nextPiece[r][c] > 0) {
+          SDL_Rect rect = {c * BLOCK_SIZE + nextOffsetX,
+                           r * BLOCK_SIZE + nextOffsetY, BLOCK_SIZE,
+                           BLOCK_SIZE};
+          SDL_Color color = COLORS[nextType];
+          SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+          SDL_RenderFillRect(renderer, &rect);
+        }
+      }
+    }
+  } else {
+    auto textSize = FontManager::getInstance().getTextSize(gameOverText, 0);
+    // draw game over text
+    FontManager::getInstance().renderText(
+        GRID_OFFSET_X, GRID_OFFSET_Y - textSize.second - 10, gameOverText, 0);
   }
 
-  // draw instructions
-  SDL_Rect instructionsRect = {
-      GRID_WIDTH * BLOCK_SIZE + GRID_OFFSET_X + 30,
-      GRID_HEIGHT * BLOCK_SIZE + GRID_OFFSET_Y - instructionsSurface->h,
-      instructionsSurface->w, instructionsSurface->h};
-  SDL_RenderCopy(Globals::renderer, instructionsTexture, NULL,
-                 &instructionsRect);
+  // text to always draw regardless of game state
+  auto instructionsSize =
+      FontManager::getInstance().getTextSize(INSTRUCTIONS, 0);
+  int textX = GRID_WIDTH * BLOCK_SIZE + GRID_OFFSET_X + 30;
+  int textY =
+      GRID_HEIGHT * BLOCK_SIZE + GRID_OFFSET_Y - instructionsSize.second;
+  FontManager::getInstance().renderText(textX, textY, INSTRUCTIONS, 0);
+  textY -= instructionsSize.second;
+
+  uint32_t elapsedTime;
+
+  if (gameOver) {
+    elapsedTime = finishTime - startTime;
+  } else {
+    elapsedTime = SDL_GetTicks() - startTime;
+  }
+  std::string timeString = formatMilliseconds(elapsedTime);
+  auto timeSize = FontManager::getInstance().getTextSize(timeString, 0);
+  FontManager::getInstance().renderText(textX, textY, timeString, 0);
+  textY -= timeSize.second;
+
+  std::string linesLeftText = std::format("Lines left: {}", linesLeft);
+  FontManager::getInstance().renderText(textX, textY, linesLeftText, 0);
 }
 
 void Tetris::handleInput(const SDL_Event& event) {
+  if (gameOver) {
+    if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_r) {
+      reset();
+    }
+    return;
+  }
+
   if (event.type == SDL_KEYDOWN) {
     switch (event.key.keysym.sym) {
       case SDLK_LEFT:
@@ -412,6 +526,21 @@ void Tetris::handleInput(const SDL_Event& event) {
         break;
       case SDLK_r:
         reset();
+        break;
+      case SDLK_c:
+        if (canSwap) {
+          if (heldPieceType == -1) {
+            heldPieceType = curType;
+            spawnNewPiece();
+          } else {
+            // swap held piece with current piece
+            int nextHeld = curType;
+            spawnNewPiece(heldPieceType);
+            heldPieceType = nextHeld;
+          }
+          lastUpdate = SDL_GetTicks();
+          canSwap = false;
+        }
         break;
       case SDLK_DOWN:
         progressPieces();
@@ -445,6 +574,10 @@ void Tetris::handleInput(const SDL_Event& event) {
 }
 
 void Tetris::update() {
+  if (gameOver) {
+    return;
+  }
+
   Uint32 currentTime = SDL_GetTicks();
   // If the piece is colliding below, give the user extra time to make rotation
   Uint32 update_delay = isColliding(currentPiece, curR + 1, curC)

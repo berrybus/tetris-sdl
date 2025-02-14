@@ -6,10 +6,13 @@
 #include <SDL2/SDL_render.h>
 #include <SDL2/SDL_stdinc.h>
 #include <SDL2/SDL_timer.h>
+#include <SDL2/SDL_ttf.h>
 #include <sys/types.h>
 
+#include <cstdint>
 #include <ctime>
 #include <iostream>
+#include <optional>
 #include <random>
 #include <vector>
 
@@ -19,6 +22,9 @@ class Tetris : public Scene {
  private:
   std::vector<std::vector<int>> grid;
   std::vector<std::vector<int>> currentPiece;
+  int nextType;
+  int heldPieceType;
+  bool canSwap;
   int curR;
   int curC;
   int curType;
@@ -30,11 +36,14 @@ class Tetris : public Scene {
   uint32_t leftTimer = 0;
   uint32_t rightTimer = 0;
   uint32_t downTimer = 0;
+  std::mt19937 gen;
+  uint32_t startTime;
+  uint32_t finishTime;
+  int linesLeft;
+  std::string gameOverText;
   bool gameOver;
-  SDL_Surface* instructionsSurface;
-  SDL_Texture* instructionsTexture;
 
-  void spawnNewPiece();
+  void spawnNewPiece(int spawnType = -1);
   bool isColliding(std::vector<std::vector<int>>& piece,
                    int pieceRow,
                    int pieceCol);
@@ -53,9 +62,7 @@ class Tetris : public Scene {
  public:
   Tetris(SceneManager& sceneManager);
 
-  bool shouldQuit() override { return gameOver; };
-
-  void render() override;
+  void render(SDL_Renderer* renderer) override;
 
   void handleInput(const SDL_Event& event) override;
 
