@@ -11,7 +11,8 @@
 #include <vector>
 
 const std::vector<std::tuple<std::string, int>> fontLocations = {
-    {"open_sans.ttf", 24}};
+    {"open_sans.ttf", 24},
+    {"roboto.ttf", 36}};
 
 class FontManager {
  private:
@@ -63,7 +64,7 @@ class FontManager {
     int x = 0;
     int y = 0;
     for (char c : text) {
-      SDL_Texture* texture = std::get<1>(font_to_cache.at(0))[c];
+      SDL_Texture* texture = std::get<1>(font_to_cache.at(font))[c];
       int w;
       int h;
       SDL_QueryTexture(texture, NULL, NULL, &w, &h);
@@ -84,7 +85,7 @@ class FontManager {
     int startingX = x;
     int startingY = y;
     for (char c : text) {
-      SDL_Texture* texture = std::get<1>(font_to_cache.at(0))[c];
+      SDL_Texture* texture = std::get<1>(font_to_cache.at(font))[c];
       int w;
       int h;
       SDL_QueryTexture(texture, NULL, NULL, &w, &h);

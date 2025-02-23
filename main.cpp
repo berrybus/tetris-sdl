@@ -1,7 +1,8 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_mixer.h>
 #include <SDL2/SDL_ttf.h>
 #include "font_manager.h"
-#include "tetris.h"
+#include "menu.h"
 
 #include <SDL2/SDL_events.h>
 #include <SDL2/SDL_keycode.h>
@@ -22,19 +23,19 @@ SDL_Renderer* renderer;
 TTF_Font* openSans;
 
 void close() {
-  TTF_CloseFont(openSans);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
+  Mix_Quit();
   SDL_Quit();
 }
 
 int main() {
-  if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
     std::cout << "could not init!" << std::endl;
     return 1;
   }
 
-  window = SDL_CreateWindow("Tetris", SDL_WINDOWPOS_CENTERED,
+  window = SDL_CreateWindow("40L TETRIS", SDL_WINDOWPOS_CENTERED,
                             SDL_WINDOWPOS_CENTERED, DEFAULT_SCREEN_WIDTH,
                             DEFAULT_SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
   if (window == NULL) {
@@ -54,11 +55,20 @@ int main() {
     return 1;
   }
 
+  Mix_Init(MIX_INIT_OGG);
+
+  if (Mix_OpenAudio(MIX_DEFAULT_FREQUENCY, MIX_DEFAULT_FORMAT,
+                    MIX_DEFAULT_CHANNELS, 2048) < 0) {
+    std::cout << "SDL_mixer could not initialize! SDL_mixer Error: "
+              << Mix_GetError() << std::endl;
+    return 1;
+  }
+
   std::random_device rd;
   std::mt19937 gen(rd());
   FontManager::getInstance().initialize(renderer);
   SceneManager sceneManager = SceneManager();
-  sceneManager.change(std::make_shared<Tetris>(sceneManager));
+  sceneManager.change(std::make_shared<Menu>(sceneManager));
   SDL_Event event;
   while (true) {
     while (SDL_PollEvent(&event)) {

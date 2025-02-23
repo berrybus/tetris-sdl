@@ -8,19 +8,19 @@
 #include <sys/types.h>
 #include <cstdint>
 #include <format>
-#include <iterator>
-#include <memory>
 #include "font_manager.h"
 #include "rng.h"
+#include "sound_manager.h"
 
 const int BLOCK_SIZE = 30;
 const int GRID_WIDTH = 10;
 const int GRID_HEIGHT = 20;
 const int GRID_OFFSET_X = 200;
 const int GRID_OFFSET_Y = 80;
+const int LINES_LEFT = 40;
 
 const Uint32 UPDATE_DELAY = 1000;
-const Uint32 LAST_ROW_UPDATE_DELAY = 2000;
+const Uint32 LAST_ROW_UPDATE_DELAY = 1500;
 
 const uint32_t DAS_DELAY = 133;
 const uint32_t DAS_REPEAT = 10;
@@ -114,7 +114,8 @@ void Tetris::spawnNewPiece(int spawnType) {
   if (isColliding(currentPiece, curR, curC)) {
     gameOver = true;
     finishTime = SDL_GetTicks();
-    gameOverText = "GAME OVER";
+    gameOverText = "GAME OVER - Press R to restart";
+    SoundManager::getInstance().playLose();
   }
 }
 
@@ -128,8 +129,9 @@ void Tetris::reset() {
   heldPieceType = -1;
   spawnNewPiece();
   startTime = SDL_GetTicks();
-  linesLeft = 40;
+  linesLeft = LINES_LEFT;
   gameOver = false;
+  SoundManager::getInstance().startMainTheme();
 }
 
 bool Tetris::isColliding(std::vector<std::vector<int>>& piece,
@@ -200,7 +202,8 @@ void Tetris::clearLines() {
   if (linesLeft == 0) {
     gameOver = true;
     finishTime = SDL_GetTicks();
-    gameOverText = "YOU WIN!";
+    gameOverText = "YOU WIN! - Press R to restart";
+    SoundManager::getInstance().playYay();
   }
 }
 
@@ -520,9 +523,11 @@ void Tetris::handleInput(const SDL_Event& event) {
         break;
       case SDLK_UP:
         rotateClockwise();
+        SoundManager::getInstance().playRotate();
         break;
       case SDLK_z:
         rotateCounterClockwise();
+        SoundManager::getInstance().playRotate();
         break;
       case SDLK_r:
         reset();
@@ -553,6 +558,7 @@ void Tetris::handleInput(const SDL_Event& event) {
         break;
       case SDLK_SPACE:
         dropPiece();
+        SoundManager::getInstance().playDrop();
         lastUpdate = SDL_GetTicks();
         break;
     }
