@@ -16,6 +16,6 @@ The build tool is `scons`. You can install it with `pip`
 
 You need SDL2, SDL2_ttf, SDL2_mixer installed in the default locations. I tested this on my Fedora 41 with Wayland machine.
 
-### Windows 11 ###
+### Windows ###
 
-I included the dependencies in the project directory. You should be able to play it by opening the `tetris.exe` in the project directory if you don't want to build it.
+I included the dependencies in the project directory. You should be able to play it by opening the `tetris.exe` in the project directory if you don't want to build it. I tested this on Windows 11
