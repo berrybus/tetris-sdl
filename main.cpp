@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_hints.h>
 #include <SDL2/SDL_mixer.h>
 #include <SDL2/SDL_ttf.h>
 #include "font_manager.h"
@@ -30,7 +31,9 @@ void close() {
 }
 
 int main() {
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
+  // There's a bug with the key events repeat handling in Wayland
+  setenv("SDL_VIDEODRIVER", "x11", 1);
+  if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
     std::cout << "could not init!" << std::endl;
     return 1;
   }
@@ -70,6 +73,9 @@ int main() {
   SceneManager sceneManager = SceneManager();
   sceneManager.change(std::make_shared<Menu>(sceneManager));
   SDL_Event event;
+
+  const Uint8* keyState = SDL_GetKeyboardState(NULL);
+
   while (true) {
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_QUIT) {

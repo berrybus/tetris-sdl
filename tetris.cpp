@@ -505,6 +505,10 @@ void Tetris::handleInput(const SDL_Event& event) {
     return;
   }
 
+  if (event.key.repeat) {
+    return;
+  }
+
   if (event.type == SDL_KEYDOWN) {
     switch (event.key.keysym.sym) {
       case SDLK_LEFT:
@@ -557,9 +561,14 @@ void Tetris::handleInput(const SDL_Event& event) {
         }
         break;
       case SDLK_SPACE:
-        dropPiece();
-        SoundManager::getInstance().playDrop();
-        lastUpdate = SDL_GetTicks();
+        if (canDrop) {
+          dropPiece();
+          SoundManager::getInstance().playDrop();
+          lastUpdate = SDL_GetTicks();
+          canDrop = false;
+        }
+        break;
+      default:
         break;
     }
   }
@@ -574,6 +583,11 @@ void Tetris::handleInput(const SDL_Event& event) {
         break;
       case SDLK_DOWN:
         downPressed = false;
+        break;
+      case SDLK_SPACE:
+        canDrop = true;
+        break;
+      default:
         break;
     }
   }

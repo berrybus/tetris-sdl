@@ -23,27 +23,27 @@ class SoundManager {
 
  public:
   SoundManager() {
-    preloop = Mix_LoadMUS("preloop.ogg");
+    preloop = Mix_LoadMUS("assets/preloop.ogg");
     if (!preloop) {
       throw std::exception();
     }
-    loop = Mix_LoadMUS("loop.ogg");
+    loop = Mix_LoadMUS("assets/loop.ogg");
     if (!loop) {
       throw std::exception();
     }
-    rotate = Mix_LoadWAV("rotate.wav");
+    rotate = Mix_LoadWAV("assets/rotate.wav");
     if (!rotate) {
       throw std::exception();
     }
-    drop = Mix_LoadWAV("drop.mp3");
+    drop = Mix_LoadWAV("assets/drop.mp3");
     if (!drop) {
       throw std::exception();
     }
-    yay = Mix_LoadWAV("yay.mp3");
+    yay = Mix_LoadWAV("assets/yay.mp3");
     if (!yay) {
       throw std::exception();
     }
-    lose = Mix_LoadWAV("gameover.wav");
+    lose = Mix_LoadWAV("assets/gameover.wav");
     if (!lose) {
       throw std::exception();
     }

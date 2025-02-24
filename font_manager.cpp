@@ -11,8 +11,8 @@
 #include "font_manager.h"
 
 const std::vector<std::tuple<std::string, int>> fontLocations = {
-    {"open_sans.ttf", 24},
-    {"roboto.ttf", 36}};
+    {"assets/open_sans.ttf", 24},
+    {"assets/roboto.ttf", 36}};
 
 void FontManager::initialize(SDL_Renderer* p_renderer) {
   renderer = p_renderer;

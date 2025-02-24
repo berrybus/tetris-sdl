@@ -42,6 +42,7 @@ class Tetris : public Scene {
   int linesLeft;
   std::string gameOverText;
   bool gameOver;
+  bool canDrop = true;
 
   void spawnNewPiece(int spawnType = -1);
   bool isColliding(std::vector<std::vector<int>>& piece,
