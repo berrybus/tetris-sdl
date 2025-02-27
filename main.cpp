@@ -30,9 +30,12 @@ void close() {
   SDL_Quit();
 }
 
-int main() {
+int main(int argc, char* argv[]) {
   // There's a bug with the key events repeat handling in Wayland
-  setenv("SDL_VIDEODRIVER", "x11", 1);
+  #ifdef __linux__
+    setenv("SDL_VIDEODRIVER", "x11", 1);
+  #endif
+  
   if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
     std::cout << "could not init!" << std::endl;
     return 1;

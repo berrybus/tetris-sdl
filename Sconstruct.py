@@ -6,7 +6,7 @@ from SCons.Script import Environment
 if platform.system() == "Linux":
     env  = Environment(CPPPATH=['/usr/include/SDL2'],LIBPATH=['/usr/lib'],LIBS=['SDL2', 'SDL2_ttf', 'SDL2_mixer'],CCFLAGS=['-std=c++20', '-g'])
 elif platform.system() == "Windows":
-    env  = Environment(CPPPATH=['windows/include'],LIBPATH=['windows/lib/x64'],LIBS=['SDL2', 'SDL2_ttf', 'SDL2_mixer', 'SDL2main', 'shell32'],CCFLAGS=['/std:c++latest'], LINKFLAGS="/SUBSYSTEM:WINDOWS")
+    env  = Environment(CPPPATH=['windows/include'],LIBPATH=['windows/lib/x64'],LIBS=['SDL2', 'SDL2main', 'SDL2_ttf', 'SDL2_mixer', 'shell32'],CCFLAGS=['/std:c++latest'], LINKFLAGS="/SUBSYSTEM:WINDOWS")
 else:
     # This will not work
     print("Unsupported environment")
